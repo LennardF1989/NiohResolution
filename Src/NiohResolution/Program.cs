@@ -10,7 +10,7 @@ using Steamless.Unpacker.Variant31.x64;
 
 namespace NiohResolution
 {
-    public class Program
+    public static class Program
     {
         private const string EXE_FILE = "nioh.exe";
         private const string EXE_FILE_BACKUP = "nioh.exe.backup.exe";
@@ -21,18 +21,18 @@ namespace NiohResolution
 
         private const string PATTERN_ASPECTRATIO2 = "00 00 87 44 00 00 F0 44";
 
-        private const string PATTERN_MAGIC1 = "0F 95 C0 88 46 34";
-        private const string PATTERN_MAGIC1_PATCH = "32 C0 90 88 46 34";
+        //private const string PATTERN_MAGIC1 = "0F 95 C0 88 46 34";
+        //private const string PATTERN_MAGIC1_PATCH = "32 C0 90 88 46 34";
 
-        private const string PATTERN_MAGIC2_A = "45 85 D2 7E 1A";
-        private const string PATTERN_MAGIC2_A_PATCH = "45 85 D2 EB 1A";
+        private const string PATTERN_MAGIC2_A = "45 2B D1 45 85 D2 7E 1A";
+        private const string PATTERN_MAGIC2_A_PATCH = "45 2B D1 45 85 D2 EB 1A";
 
         private const string PATTERN_MAGIC2_B = "C3 79 14";
         private const string PATTERN_MAGIC2_B_PATCH = "C3 EB 14";
 
-        private const string PATTERN_RESOLUTION = "80 07 00 00 38 04 00 00";
+        private const string PATTERN_RESOLUTION = "80 07 00 00 38 04 00 00 00 00 00 00 00 00 00 00";
 
-        public static void Main(string[] args)
+        public static void Main(string[] _)
         {
             Thread.CurrentThread.CurrentCulture = new CultureInfo("en-US");
 
@@ -97,7 +97,7 @@ namespace NiohResolution
                 return;
             }
 
-            Console.WriteLine("\nAn experimental patch for the aspect ratio of FMV's is available.\n");
+            Console.WriteLine("\nAn experimental patch for the aspect ratio of FMV's is available, most likely only works on very old versions.\n");
 
             if (ReadBool("Do you want to apply this patch?", false))
             {
@@ -114,7 +114,7 @@ namespace NiohResolution
                     Console.WriteLine("-> Patching failed, rolling back changes...");
                 }
             }
-            
+
             Console.WriteLine($"\nBacking up {EXE_FILE}...");
 
             File.Copy(EXE_FILE, EXE_FILE_BACKUP, true);
@@ -127,7 +127,8 @@ namespace NiohResolution
             Console.WriteLine("\nDone! Don't forget to apply the following changes in the launcher:");
             Console.WriteLine("- Set the Render Resolution to High");
             Console.WriteLine("- Set the Resolution to 1920x1080");
-
+            Console.WriteLine("-> NOTE: If this results in pillarboxes, select something close to your native resolution instead.");
+            
             Exit();
         }
 
@@ -212,15 +213,15 @@ namespace NiohResolution
             var ratio2Patch = ConvertToBytes(ratioHeight).Concat(ConvertToBytes(ratioWidth)).ToArray();
             Patch(ref buffer, positions, ratio2Patch);
 
-            //Magic Fix #1
-            positions = FindSequence(ref buffer, StringToPattern(PATTERN_MAGIC1), 0);
+            //Magic Fix #1 - Looks like this is no longer needed
+            /*positions = FindSequence(ref buffer, StringToPattern(PATTERN_MAGIC1), 0);
 
             if (!AssertEquals(nameof(PATTERN_MAGIC1), 1, positions.Count))
             {
                 return false;
             }
 
-            Patch(ref buffer, positions, StringToPattern(PATTERN_MAGIC1_PATCH));
+            Patch(ref buffer, positions, StringToPattern(PATTERN_MAGIC1_PATCH));*/
 
             //Magic Fix #2 - A
             positions = FindSequence(ref buffer, StringToPattern(PATTERN_MAGIC2_A), 0);
