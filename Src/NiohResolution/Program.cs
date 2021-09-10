@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Text;
 using Steamless.API.Model;
 using Steamless.API.Services;
 using Steamless.Unpacker.Variant31.x64;
@@ -21,16 +22,16 @@ namespace NiohResolution
 
         private const string PATTERN_ASPECTRATIO2 = "00 00 87 44 00 00 F0 44";
 
-        private const string PATTERN_MAGIC1 = "0F 95 C0 88 46 34";
+        private const string PATTERN_MAGIC1 = "00 00 00 41 88 46 34";
         private const string PATTERN_MAGIC1_PATCH = "32 C0 90 88 46 34";
 
-        private const string PATTERN_MAGIC2_A = "45 85 D2 7E 1A";
-        private const string PATTERN_MAGIC2_A_PATCH = "45 85 D2 EB 1A";
+        private const string PATTERN_MAGIC2_A = "45 85 D2 7E 1A 48";
+        private const string PATTERN_MAGIC2_A_PATCH = "50 45 00 00 64";
 
         private const string PATTERN_MAGIC2_B = "C3 79 14";
         private const string PATTERN_MAGIC2_B_PATCH = "C3 EB 14";
 
-        private const string PATTERN_RESOLUTION = "80 07 00 00 38 04 00 00";
+        private const string PATTERN_RESOLUTION = "80 07 00 00 38 04 00 00 00";
 
         public static void Main(string[] args)
         {
@@ -147,7 +148,6 @@ namespace NiohResolution
             if (!result)
             {
                 Console.WriteLine($"-> Cannot process {EXE_FILE}!");
-
                 return false;
             }
 
@@ -178,8 +178,8 @@ namespace NiohResolution
         private static bool PatchAspectRatio(ref byte[] buffer, int width, int height)
         {
             float ratio = width / (float)height;
-            float ratioWidth = 1920;
-            float ratioHeight = 1080;
+            float ratioWidth = 2560;
+            float ratioHeight = 1440;
 
             if (ratio < 1.77777)
             {
@@ -190,11 +190,14 @@ namespace NiohResolution
                 ratioWidth = ratioHeight * ratio;
             }
 
+            Console.WriteLine($"Width: {ratioWidth}, Height: {ratioHeight}");
+
             //Aspect Ratio Fix #1
             var positions = FindSequence(ref buffer, StringToPattern(PATTERN_ASPECTRATIO1), 0);
 
             if (!AssertEquals(nameof(PATTERN_ASPECTRATIO1), 1, positions.Count))
             {
+                positions.ToList().ForEach(i => Console.WriteLine(i.ToString()));
                 return false;
             }
 
@@ -206,6 +209,7 @@ namespace NiohResolution
 
             if (!AssertEquals(nameof(PATTERN_ASPECTRATIO2), 1, positions.Count))
             {
+                positions.ToList().ForEach(i => Console.WriteLine(i.ToString()));
                 return false;
             }
 
@@ -217,6 +221,7 @@ namespace NiohResolution
 
             if (!AssertEquals(nameof(PATTERN_MAGIC1), 1, positions.Count))
             {
+                positions.ToList().ForEach(i => Console.WriteLine(i.ToString()));
                 return false;
             }
 
@@ -227,6 +232,7 @@ namespace NiohResolution
 
             if (!AssertEquals(nameof(PATTERN_MAGIC2_A), 1, positions.Count))
             {
+                positions.ToList().ForEach(i => Console.WriteLine(i.ToString()));
                 return false;
             }
 
@@ -237,6 +243,7 @@ namespace NiohResolution
 
             if (!AssertEquals(nameof(PATTERN_MAGIC2_B), 1, positions.Count))
             {
+                positions.ToList().ForEach(i => Console.WriteLine(i.ToString()));
                 return false;
             }
 
@@ -251,6 +258,7 @@ namespace NiohResolution
 
             if (!AssertEquals(nameof(PATTERN_RESOLUTION), 2, positions.Count))
             {
+                positions.ToList().ForEach(i => Console.WriteLine(i.ToString()));
                 return false;
             }
 
@@ -486,6 +494,7 @@ namespace NiohResolution
         //Source: https://stackoverflow.com/questions/283456/byte-array-pattern-search
         private static List<int> FindSequence(ref byte[] buffer, byte[] pattern, int startIndex)
         {
+            //Console.WriteLine($"BUFF: {buffer.Length}, PATT: {Encoding.UTF8.GetString(pattern)}, SINDEX: {startIndex}");
             List<int> positions = new List<int>();
 
             int i = Array.IndexOf(buffer, pattern[0], startIndex);
