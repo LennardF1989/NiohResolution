@@ -178,8 +178,8 @@ namespace NiohResolution
         private static bool PatchAspectRatio(ref byte[] buffer, int width, int height)
         {
             float ratio = width / (float)height;
-            float ratioWidth = 2560;
-            float ratioHeight = 1440;
+            float ratioWidth = 1920;
+            float ratioHeight = 1080;
 
             if (ratio < 1.77777)
             {
