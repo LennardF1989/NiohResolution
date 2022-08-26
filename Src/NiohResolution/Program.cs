@@ -21,14 +21,9 @@ namespace NiohResolution
 
         private const string PATTERN_ASPECTRATIO2 = "00 00 87 44 00 00 F0 44";
 
-        //private const string PATTERN_MAGIC1 = "0F 95 C0 88 46 34";
-        //private const string PATTERN_MAGIC1_PATCH = "32 C0 90 88 46 34";
-
-        private const string PATTERN_MAGIC2_A = "45 2B D1 45 85 D2 7E 1A";
-        private const string PATTERN_MAGIC2_A_PATCH = "45 2B D1 45 85 D2 EB 1A";
-
-        private const string PATTERN_MAGIC2_B = "C3 79 14";
-        private const string PATTERN_MAGIC2_B_PATCH = "C3 EB 14";
+        private const string PATTERN_ASPECTRATIO3 = "8B D7 0F 95 05";
+        private const int PATTERN_ASPECTRATIO3_OFFSET1 = 5;
+        private const int PATTERN_ASPECTRATIO3_OFFSET2 = 2;
 
         private const string PATTERN_RESOLUTION = "80 07 00 00 38 04 00 00 00 00 00 00 00 00 00 00";
 
@@ -37,6 +32,8 @@ namespace NiohResolution
             Thread.CurrentThread.CurrentCulture = new CultureInfo("en-US");
 
             Console.WriteLine("Welcome to the Nioh Resolution patcher!");
+
+            Console.WriteLine("\nNOTE! This patcher is compatible with Nioh v1.24.07 and (potentially) newer. If you have an older version of the game, please use an older version of this patcher!");
 
             Console.WriteLine("\nPlease enter your desired resolution.\n");
 
@@ -97,24 +94,6 @@ namespace NiohResolution
                 return;
             }
 
-            Console.WriteLine("\nAn experimental patch for the aspect ratio of FMV's is available, most likely only works on very old versions.\n");
-
-            if (ReadBool("Do you want to apply this patch?", false))
-            {
-                Console.WriteLine("\nPatching FMV's...");
-
-                byte[] bufferCopy = buffer.ToArray();
-                result = PatchFMV(ref bufferCopy);
-                if (result)
-                {
-                    buffer = bufferCopy;
-                }
-                else
-                {
-                    Console.WriteLine("-> Patching failed, rolling back changes...");
-                }
-            }
-
             Console.WriteLine($"\nBacking up {EXE_FILE}...");
 
             File.Copy(EXE_FILE, EXE_FILE_BACKUP, true);
@@ -127,8 +106,7 @@ namespace NiohResolution
             Console.WriteLine("\nDone! Don't forget to apply the following changes in the launcher:");
             Console.WriteLine("- Set the Render Resolution to High");
             Console.WriteLine("- Set the Resolution to 1920x1080");
-            Console.WriteLine("-> NOTE: If this results in pillarboxes, select something close to your native resolution instead.");
-            
+
             Exit();
         }
 
@@ -213,35 +191,31 @@ namespace NiohResolution
             var ratio2Patch = ConvertToBytes(ratioHeight).Concat(ConvertToBytes(ratioWidth)).ToArray();
             Patch(ref buffer, positions, ratio2Patch);
 
-            //Magic Fix #1 - Looks like this is no longer needed
-            /*positions = FindSequence(ref buffer, StringToPattern(PATTERN_MAGIC1), 0);
+            //Aspect Ratio Fix #3
+            positions = FindSequence(ref buffer, StringToPattern(PATTERN_ASPECTRATIO3), 0);
 
-            if (!AssertEquals(nameof(PATTERN_MAGIC1), 1, positions.Count))
+            if (!AssertEquals(nameof(PATTERN_ASPECTRATIO3), 2, positions.Count))
             {
                 return false;
             }
 
-            Patch(ref buffer, positions, StringToPattern(PATTERN_MAGIC1_PATCH));*/
-
-            //Magic Fix #2 - A
-            positions = FindSequence(ref buffer, StringToPattern(PATTERN_MAGIC2_A), 0);
-
-            if (!AssertEquals(nameof(PATTERN_MAGIC2_A), 1, positions.Count))
+            foreach (var p in positions)
             {
-                return false;
+                //Read the pointer
+                byte a = buffer[p + PATTERN_ASPECTRATIO3_OFFSET1 + 0];
+                byte b = buffer[p + PATTERN_ASPECTRATIO3_OFFSET1 + 1];
+                byte c = buffer[p + PATTERN_ASPECTRATIO3_OFFSET1 + 2];
+                byte d = buffer[p + PATTERN_ASPECTRATIO3_OFFSET1 + 3];
+
+                //Change "setne [pointer]" to "mov [pointer],0"
+                buffer[p + PATTERN_ASPECTRATIO3_OFFSET2 + 0] = 0xC6;
+                buffer[p + PATTERN_ASPECTRATIO3_OFFSET2 + 1] = 0x05;
+                buffer[p + PATTERN_ASPECTRATIO3_OFFSET2 + 2] = a;
+                buffer[p + PATTERN_ASPECTRATIO3_OFFSET2 + 3] = b;
+                buffer[p + PATTERN_ASPECTRATIO3_OFFSET2 + 4] = c;
+                buffer[p + PATTERN_ASPECTRATIO3_OFFSET2 + 5] = d;
+                buffer[p + PATTERN_ASPECTRATIO3_OFFSET2 + 6] = 0;
             }
-
-            Patch(ref buffer, positions, StringToPattern(PATTERN_MAGIC2_A_PATCH));
-
-            //Magic Fix #2 - B
-            positions = FindSequence(ref buffer, StringToPattern(PATTERN_MAGIC2_B), positions.First());
-
-            if (!AssertEquals(nameof(PATTERN_MAGIC2_B), 1, positions.Count))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, positions.First(), StringToPattern(PATTERN_MAGIC2_B_PATCH));
 
             return true;
         }
@@ -265,103 +239,6 @@ namespace NiohResolution
 
             resolution = ConvertToBytes(internalWidth).Concat(ConvertToBytes(internalHeight)).ToArray();
             Patch(ref buffer, positions[1], resolution);
-
-            return true;
-        }
-
-        //Source: http://www.wsgf.org/forums/viewtopic.php?f=64&t=32376&start=150
-        private static bool PatchFMV(ref byte[] buffer)
-        {
-            //Magic Fix #1
-            var offset = 0x3c5b78;
-            var find = "96 40 01 66 0F 7F 41";
-            var patch = "E9 62 31 40 01 90 90";
-            var result = CompareSequence(ref buffer, StringToPattern(find), offset);
-
-            if (!AssertEquals("FMV_MAGIC1", true, result))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, offset, StringToPattern(patch));
-
-            //Magic Fix #2
-            offset = 0xb5965f;
-            find = "61 00 48 8B 74 24 38 48";
-            patch = "E9 45 F7 C6 00 90 90 90";
-            result = CompareSequence(ref buffer, StringToPattern(find), offset);
-
-            if (!AssertEquals("FMV_MAGIC2", true, result))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, offset, StringToPattern(patch));
-
-            //Magic Fix #3
-            offset = 0x1159f5b;
-            find = "25 48 8B 47 78 48 03";
-            patch = "E9 4F ED 66 78 90 90";
-            result = CompareSequence(ref buffer, StringToPattern(find), offset);
-
-            if (!AssertEquals("FMV_MAGIC3", true, result))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, offset, StringToPattern(patch));
-
-            //Magic Fix #4
-            offset = 0x1159f7c;
-            find = "8B 01 FF 50 78 48 8B";
-            patch = "E9 41 ED 66 00 90 90";
-            result = CompareSequence(ref buffer, StringToPattern(find), offset);
-
-            if (!AssertEquals("FMV_MAGIC4", true, result))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, offset, StringToPattern(patch));
-
-            //Magic Fix #5
-            offset = 0x11698e9;
-            find = "00 89 41 24 8B 87";
-            patch = "E9 16 F4 65 8B 90";
-            result = CompareSequence(ref buffer, StringToPattern(find), offset);
-
-            if (!AssertEquals("FMV_MAGIC5", true, result))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, offset, StringToPattern(patch));
-
-            //Magic Fix #6
-            offset = 0x1196c12;
-            find = "20 E8 C8 CB FC FF 83 BF";
-            patch = "E9 5F 21 63 00 90 90 90";
-            result = CompareSequence(ref buffer, StringToPattern(find), offset);
-
-            if (!AssertEquals("FMV_MAGIC6", true, result))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, offset, StringToPattern(patch));
-
-            //Magic Fix #7
-            offset = 0x17c8caf;
-            find = "CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC";
-            patch = "4C 03 87 88 00 00 00 C6 87 F4 23 08 F5 00 E9 A0 12 99 FF 48 8B 47 78 48 03 C0 80 7B 44 00 0F 84 B0 12 99 FF C6 87 F4 23 08 F5 01 E9 A4 12 99 FF C7 41 50 39 8E E3 3F 49 8B 81 B0 0D 00 00 F3 0F 10 80 78 13 00 00 F3 0F 59 41 50 F3 0F 11 41 50 E9 7B CE BF FE 49 8B 45 40 80 B8 74 2A 36 FF 01 74 0B 8B 87 78 01 00 00 E9 D3 0B 9A FF F3 44 0F 10 BF 78 01 00 00 F3 44 0F 59 B8 78 2A 36 FF F3 44 0F 5E B8 7C 2A 36 FF F3 44 0F 11 79 18 45 0F 57 FF DB 87 38 03 00 00 D8 88 78 2A 36 FF D8 B0 7C 2A 36 FF DB 9F 38 03 00 00 D9 87 80 03 00 00 D8 B0 78 2A 36 FF D8 88 7C 2A 36 FF D9 9F 80 03 00 00 E9 7C 0B 9A FF 4C 8B 44 24 58 4D 8B 80 6B 50 27 01 41 80 78 D4 01 74 0D F3 0F 10 9F B0 08 00 00 E9 84 DE 9C FF F3 0F 10 9F B0 08 00 00 F3 41 0F 5E 58 D8 E9 71 DE 9C FF 4C 8B 5C 24 28 4D 8B 9B 8F 7B E9 01 41 80 7B D4 01 74 0D F3 0F 11 89 CC 01 00 00 E9 9E 08 39 FF F3 41 0F 5E 4B D8 F3 41 0F 59 4B DC F3 0F 11 89 CC 01 00 00 E9 85 08 39 FF";
-            result = CompareSequence(ref buffer, StringToPattern(find), offset);
-
-            if (!AssertEquals("FMV_MAGIC7", true, result))
-            {
-                return false;
-            }
-
-            Patch(ref buffer, offset, StringToPattern(patch));
 
             return true;
         }
@@ -510,19 +387,6 @@ namespace NiohResolution
             }
 
             return positions;
-        }
-
-        private static bool CompareSequence(ref byte[] buffer, byte[] pattern, int startIndex)
-        {
-            if (startIndex > buffer.Length - pattern.Length)
-            {
-                return false;
-            }
-
-            byte[] segment = new byte[pattern.Length];
-            Buffer.BlockCopy(buffer, startIndex, segment, 0, pattern.Length);
-
-            return segment.SequenceEqual(pattern);
         }
 
         private static bool AssertEquals<T>(string name, T expected, T value)
